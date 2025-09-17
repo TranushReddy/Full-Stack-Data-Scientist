@@ -1,0 +1,169 @@
+CREATE TABLE IF NOT EXISTS members (
+    member_id serial PRIMARY KEY,
+    name text NOT NULL,
+    email text UNIQUE NOT NULL,
+    join_date timestamptz DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS books (
+    book_id serial PRIMARY KEY,
+    title text NOT NULL,
+    author text NOT NULL,
+    category text,
+    stock int NOT NULL DEFAULT 1
+);
+
+CREATE TABLE IF NOT EXISTS borrow_records (
+    record_id serial PRIMARY KEY,
+    member_id int REFERENCES members(member_id) ON DELETE CASCADE,
+    book_id int REFERENCES books(book_id) ON DELETE CASCADE,
+    borrow_date timestamptz DEFAULT NOW(),
+    return_date timestamptz
+);
+
+
+DROP FUNCTION borrow_book(integer,integer);
+
+CREATE OR REPLACE FUNCTION public.borrow_book(p_member_id INTEGER, p_book_id INTEGER)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    current_stock INTEGER;
+BEGIN
+    -- Check if book exists and get current stock
+    SELECT stock INTO current_stock
+    FROM public.books
+    WHERE book_id = p_book_id;
+    
+    -- If book doesn't exist or no stock, the Python code will handle the error
+    IF current_stock IS NULL OR current_stock <= 0 THEN
+        RETURN;
+    END IF;
+    
+    -- Decrease stock
+    UPDATE public.books
+    SET stock = stock - 1
+    WHERE book_id = p_book_id;
+    
+    -- Insert borrow record
+    INSERT INTO public.borrow_records (member_id, book_id, borrow_date)
+    VALUES (p_member_id, p_book_id, NOW());
+END;
+$$;
+
+DROP FUNCTION return_book(integer,integer);
+
+-- Function to return a book (matches your Python return_book method)
+CREATE OR REPLACE FUNCTION public.return_book(p_member_id INTEGER, p_book_id INTEGER)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    active_record_id INTEGER;
+BEGIN
+    -- Find active borrow record
+    SELECT record_id INTO active_record_id
+    FROM public.borrow_records
+    WHERE borrow_records.member_id = p_member_id
+        AND borrow_records.book_id = p_book_id
+        AND return_date IS NULL
+    LIMIT 1;
+    
+    -- If no active record found, let Python handle the error
+    IF active_record_id IS NULL THEN
+        RETURN;
+    END IF;
+    
+    -- Update return date
+    UPDATE public.borrow_records
+    SET return_date = NOW()
+    WHERE record_id = active_record_id;
+    
+    -- Increase stock
+    UPDATE public.books
+    SET stock = stock + 1
+    WHERE books.book_id = p_book_id;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.increment_book_stock(book_id INTEGER)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+    UPDATE public.books
+    SET stock = stock + 1
+    WHERE books.book_id = increment_book_stock.book_id;
+END;
+$$;
+
+-- Function to get most borrowed books (keep exactly as your Python code expects)
+CREATE OR REPLACE FUNCTION public.get_most_borrowed_books(p_limit INTEGER)
+RETURNS TABLE(title TEXT, author TEXT, borrow_count BIGINT)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        b.title,
+        b.author,
+        COUNT(br.book_id) AS borrow_count
+    FROM
+        public.books b
+    LEFT JOIN
+        public.borrow_records br ON b.book_id = br.book_id
+    GROUP BY
+        b.book_id, b.title, b.author
+    ORDER BY
+        borrow_count DESC
+    LIMIT p_limit;
+END;
+$$;
+
+-- Function to get overdue books (keep exactly as your Python code expects)
+CREATE OR REPLACE FUNCTION public.get_overdue_books()
+RETURNS TABLE(member_name TEXT, book_title TEXT, borrow_date TIMESTAMPTZ)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        m.name,
+        b.title,
+        br.borrow_date
+    FROM
+        public.borrow_records br
+    JOIN
+        public.members m ON br.member_id = m.member_id
+    JOIN
+        public.books b ON br.book_id = b.book_id
+    WHERE
+        br.return_date IS NULL
+        AND br.borrow_date < NOW() - INTERVAL '14 days';
+END;
+$$;
+
+-- Function to count borrowed books per member (keep exactly as your Python code expects)
+CREATE OR REPLACE FUNCTION public.count_borrowed_per_member()
+RETURNS TABLE(member_name TEXT, borrowed_count BIGINT)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        m.name,
+        COUNT(br.record_id) AS borrowed_count
+    FROM
+        public.members m
+    LEFT JOIN
+        public.borrow_records br ON m.member_id = br.member_id
+    GROUP BY
+        m.member_id, m.name
+    ORDER BY
+        borrowed_count DESC;
+END;
+$$;
