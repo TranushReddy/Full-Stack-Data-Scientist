@@ -3,11 +3,11 @@ from supabase import create_client, Client
 from datetime import datetime
 
 SUPABASE_URL = os.environ.get(
-    "SUPABASE_URL", "https://konjgiwrilvsqghdvwlr.supabase.co"
+    "SUPABASE_URL", "url"
 )
 SUPABASE_KEY = os.environ.get(
     "SUPABASE_KEY",
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtvbmpnaXdyaWx2c3FnaGR2d2xyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgwODE4MTUsImV4cCI6MjA3MzY1NzgxNX0.5zTui4ccgIqyu3uwmtDyw0R9FcK6KEQEvYEoDL5RIPA",
+    "key",
 )
 
 
@@ -404,3 +404,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
