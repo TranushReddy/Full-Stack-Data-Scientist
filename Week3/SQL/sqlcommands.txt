@@ -1,0 +1,190 @@
+create table Customer(cust_id serial PRIMARY KEY,
+name text,
+email text UNIQUE,
+phoneNo integer NOT NULL,
+city text);
+
+CREATE TABLE Products (
+    prod_id INT PRIMARY KEY,
+    name VARCHAR(50),
+    price DECIMAL(10, 2) CHECK (price > 0),
+    stock INT DEFAULT 0
+);
+
+CREATE TABLE Orders (
+    order_id INT PRIMARY KEY,
+    cust_id INT,
+    order_date DATE,
+    FOREIGN KEY (cust_id) REFERENCES Customer(cust_id)
+);
+
+ALTER TABLE Products
+ADD COLUMN category VARCHAR(50);
+
+INSERT INTO Customer (cust_id,name,email,phoneNo,city) values
+(1,'tranush','tranush@example.com',8463,'hyderabad'),
+(2,'Rahul','Rahul@example.com',9988,'banglore'),
+(3,'sanjay','sanjay@example.com',9009,'hyderabad'),
+(4,'Amit','Amit@example.com',9989,'mumbai'),
+(5,'naveen','naveen@example.com',9848,'hyderabad');
+
+INSERT INTO Products (prod_id, name, price, stock, category) VALUES
+(101, 'Laptop', 75000.00, 10, 'Electronics'),
+(102, 'Smartphone', 45000.00, 20, 'Electronics'),
+(103, 'T-Shirt', 800.00, 50, 'Apparel'),
+(104, 'Book', 350.00, 100, 'Books'),
+(105, 'Headphones', 2500.00, 30, 'Electronics');
+
+UPDATE Products
+SET price = 80000.00
+WHERE prod_id = 101;
+
+DELETE FROM Customer
+WHERE cust_id = 5;
+
+UPDATE Products
+SET stock = stock + 50
+WHERE prod_id = 104;
+
+SELECT * FROM Customer where city='hyderabad';
+
+SELECT * FROM Products where price>1000;
+
+SELECT DISTINCT city FROM Customer;
+
+SELECT * FROM Products ORDER BY price DESC LIMIT 3;
+
+SELECT * FROM Customer ORDER BY name ASC;  
+
+CREATE TABLE Order_Items (
+    order_id INT,
+    prod_id INT,
+    quantity INT,
+    price DECIMAL(10, 2),
+    FOREIGN KEY (order_id) REFERENCES Orders(order_id),
+    FOREIGN KEY (prod_id) REFERENCES Products(prod_id)
+);
+
+INSERT INTO Orders (order_id, cust_id, order_date) VALUES
+(1001, 1, '2025-09-10'),
+(1002, 2, '2025-09-10'),
+(1003, 3, '2025-09-11'),
+(1004, 1, '2025-09-11'),
+(1005, 4, '2025-09-12'),
+(1006, 3, '2025-09-12'),
+(1007, 1, '2025-09-13');
+
+INSERT INTO Order_Items (order_id, prod_id, quantity, price) VALUES
+(1001, 101, 1, 80000.00),  
+(1001, 105, 1, 2500.00),   
+(1002, 102, 1, 45000.00), 
+(1003, 103, 2, 800.00),    
+(1004, 104, 3, 350.00),    
+(1004, 105, 1, 2500.00),  
+(1005, 102, 1, 45000.00), 
+(1006, 101, 1, 80000.00), 
+(1007, 103, 1, 800.00);
+
+SELECT COUNT(*) FROM Customer;
+
+SELECT SUM(price * quantity) AS total_revenue FROM Order_Items;
+
+SELECT AVG(price) FROM Products;
+
+SELECT cust_id, COUNT(order_id) AS total_orders
+FROM Orders
+GROUP BY cust_id;
+
+SELECT cust_id
+FROM Orders
+GROUP BY cust_id
+HAVING COUNT(order_id) > 2;
+
+SELECT O.order_id, C.name AS customer_name, O.order_date
+FROM Orders O
+INNER JOIN Customer C ON O.cust_id = C.cust_id;
+
+SELECT P.name AS product_name
+FROM Customer C
+JOIN Orders O ON C.cust_id = O.cust_id
+JOIN Order_Items OI ON O.order_id = OI.order_id
+JOIN Products P ON OI.prod_id = P.prod_id
+WHERE C.name = 'Rahul';
+
+SELECT C.name
+FROM Customer C
+LEFT JOIN Orders O ON C.cust_id = O.cust_id
+WHERE O.order_id IS NULL;
+
+SELECT P.name, SUM(OI.quantity) AS total_quantity_sold
+FROM Products P
+JOIN Order_Items OI ON P.prod_id = OI.prod_id
+GROUP BY P.name;
+
+SELECT C.name, O.order_id
+FROM Customer C
+FULL JOIN Orders O ON C.cust_id = O.cust_id;
+
+SELECT name, price
+FROM Products
+WHERE price > (SELECT AVG(price) FROM Products);
+
+SELECT name
+FROM Customer
+WHERE cust_id IN (
+    SELECT O.cust_id
+    FROM Orders O
+    JOIN Order_Items OI ON O.order_id = OI.order_id
+    JOIN Products P ON OI.prod_id = P.prod_id
+    WHERE P.name = 'Laptop'
+);
+
+SELECT *
+FROM Products
+WHERE price = (SELECT MAX(price) FROM Products);
+
+SELECT *
+FROM Orders
+WHERE cust_id IN (
+    SELECT cust_id
+    FROM Orders
+    GROUP BY cust_id
+    ORDER BY COUNT(order_id) DESC
+    LIMIT 3
+);
+
+SELECT name
+FROM Products
+WHERE prod_id NOT IN (
+    SELECT DISTINCT prod_id FROM Order_Items
+);
+
+SELECT name FROM Customer
+INTERSECT
+SELECT T2.name FROM Orders AS T1
+INNER JOIN Customer AS T2 ON T1.cust_id = T2.cust_id;
+
+SELECT name FROM Customer
+EXCEPT
+SELECT T2.name FROM Orders AS T1
+INNER JOIN Customer AS T2 ON T1.cust_id = T2.cust_id;
+
+drop table order_items;
+drop table orders;
+drop table products;
+drop table customer;
+
+
+create table public.products (
+  product_id serial not null,
+  name text not null,
+  sku text not null,
+  price numeric(10, 2) not null,
+  stock integer not null default 0,
+  created_at timestamp with time zone null default now(),
+  constraint products_pkey primary key (product_id),
+  constraint products_sku_key unique (sku),
+  constraint products_price_check check ((price > (0)::numeric))
+) TABLESPACE pg_default;
+
+
